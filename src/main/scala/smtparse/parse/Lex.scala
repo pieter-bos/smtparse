@@ -1,6 +1,6 @@
-package smtsolve.smt
+package smtparse.parse
 
-import smtsolve.smt.Lex.LexError
+import smtparse.parse.Lex.LexError
 
 import java.io.{IOException, Reader}
 import scala.annotation.tailrec
@@ -56,17 +56,17 @@ case class Lex(in: Reader) extends Iterator[SmtToken] {
   override def next(): SmtToken = {
     skipWhitespace()
     // hasNext is a precondition of next, so peek.nonEmpty
-    read().get match {
-      case '(' => ParenOpen
-      case ')' => ParenClose
-      case '0' => Numeral(0)
+    (read().get match {
+      case '(' => TokParenOpen
+      case ')' => TokParenClose
+      case '0' => TokNumeral(0)
       case c if "123456789".contains(c) =>
         val buf = new StringBuilder
         buf.append(c)
         while(peek.nonEmpty && "0123456789".contains(peek.get)) {
           buf.append(read().get)
         }
-        Numeral(BigInt(buf.toString(), radix = 10))
+        TokNumeral(BigInt(buf.toString(), radix = 10))
       case '#' =>
         peek match {
           case None => throw LexError("Unterminated hex/binary constant")
@@ -78,7 +78,7 @@ case class Lex(in: Reader) extends Iterator[SmtToken] {
 
             buf.toString() match {
               case "" => throw LexError("Empty hex constant")
-              case other => Hexadecimal(other)
+              case other => TokHexadecimal(other)
             }
           case Some('b') =>
             val buf = new StringBuilder
@@ -88,7 +88,7 @@ case class Lex(in: Reader) extends Iterator[SmtToken] {
 
             buf.toString() match {
               case "" => throw LexError("Empty binary constant")
-              case other => Hexadecimal(other)
+              case other => TokHexadecimal(other)
             }
           case Some(other) => throw LexError(s"Invalid number designator #$other")
         }
@@ -105,7 +105,7 @@ case class Lex(in: Reader) extends Iterator[SmtToken] {
           case _ => ???
         }
 
-        StringLiteral(buf.toString())
+        TokStringLiteral(buf.toString())
       case c if ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || "~!@$%^&*_-+=<>.?/".contains(c) =>
         val buf = new StringBuilder
         buf.append(c)
@@ -114,7 +114,7 @@ case class Lex(in: Reader) extends Iterator[SmtToken] {
           buf.append(read().get)
         }
 
-        Symbol(buf.toString())
+        TokSymbol(buf.toString())
       case '|' =>
         val buf = new StringBuilder
 
@@ -129,17 +129,48 @@ case class Lex(in: Reader) extends Iterator[SmtToken] {
           case _ => ???
         }
 
-        Symbol(buf.toString())
+        TokSymbol(buf.toString())
       case ':' =>
         if(hasNext) {
           next() match {
-            case Symbol(name) => Keyword(name)
+            case TokSymbol(name) => TokKeyword(name)
             case other => throw LexError(s"colon must be immediately followed by symbol, but instead $other was encountered")
           }
         } else {
           throw LexError("Empty keyword")
         }
       case other => throw LexError(s"Invalid character: $other")
+    }) match {
+      case TokSymbol("!") => TokExclamationPoint
+      case TokSymbol("_") => TokUnderscore
+      case TokSymbol("as") => TokAs
+      case TokSymbol("BINARY") => TokKwdBinary
+      case TokSymbol("DECIMAL") => TokKwdDecimal
+      case TokSymbol("exists") => TokExists
+      case TokSymbol("HEXADECIMAL") => TokKwdHexadecimal
+      case TokSymbol("forall") => TokForall
+      case TokSymbol("let") => TokLet
+      case TokSymbol("match") => TokMatch
+      case TokSymbol("NUMERAL") => TokKwdNumeral
+      case TokSymbol("par") => TokPar
+      case TokSymbol("STRING") => TokKwdString
+
+      case TokNumeral(n) =>
+        peek match {
+          case Some('.') =>
+            read()
+            var value = n
+            var scale = 0
+            while(peek.nonEmpty && '0' <= peek.get && peek.get <= '9') {
+              value *= 10
+              value += "0123456789".indexOf(read().get)
+              scale += 1
+            }
+            TokDecimal(BigDecimal(value, scale))
+          case _ => TokNumeral(n)
+        }
+
+      case other => other
     }
   }
 }
