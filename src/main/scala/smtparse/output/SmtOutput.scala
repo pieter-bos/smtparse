@@ -170,11 +170,28 @@ case class SmtOutput(stream: Writer, dialect: Dialect) {
         write(")")
     }
 
+  def boxSingularPattern(pattern: SExpr): SExpr =
+    pattern match {
+      case SExprApply(args) =>
+        // If any element of the pattern is just a symbol, likely the pattern is not wrapped in a list.
+        if(args.forall(_.isInstanceOf[SExprApply])) SExprApply(args)
+        else SExprApply(Seq(SExprApply(args)))
+      case other => other // ???
+    }
+
   def write(attr: Attribute): this.type = {
     write(":")
     write(attr.key)
     attr.value match {
-      case Some(value) => write(" ").write(value)
+      case Some(value) =>
+        write(" ")
+        attr.key match {
+          case "pattern" => dialect match {
+            case Dialect.Z3 => write(value)
+            case Dialect.CVC5 => write(boxSingularPattern(value))
+          }
+          case _ => write(value)
+        }
       case None => this
     }
   }

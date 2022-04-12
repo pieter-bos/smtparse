@@ -71,7 +71,7 @@ class Multiplexer(backends: Seq[Verifier]) {
         case Verifier.Unsat => "unsat\n"
         case Verifier.Sat => "sat\n"
         case Verifier.Unknown => "unknown\n"
-        case Verifier.Error(err) => println(err); ???
+        case Verifier.Error(err) => err + "\n"
       }
     case Push(n) =>
       for(_ <- 0 until n.toInt) {
