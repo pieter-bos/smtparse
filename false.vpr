@@ -1,0 +1,4 @@
+method myMethod(r: Ref)
+{
+  assert false == true
+}

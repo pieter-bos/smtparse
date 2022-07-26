@@ -47,10 +47,22 @@ case object Main {
 
     val cvc5 = PinnedOptionsVerifier(Seq("cvc5", "-"), Dialect.CVC5, Map.empty)
 
-    val multiplexer = new Multiplexer(Seq(z3SiliconDefault, cvc5))
+    val vampire = PinnedOptionsVerifier(Seq("vampire",
+      "--input_syntax", "smtlib2",
+      "--output_mode", "smtcomp",
+      // "-t", "3",
+    ), Dialect.Vampire, Map.empty)
+
+    val z3cvc5M = new Multiplexer(Seq(z3SiliconDefault, cvc5))
+    val z3M = new Multiplexer(Seq(z3SiliconDefault))
+    val vampireM = new Multiplexer(Seq(vampire))
+    val multiplexer = vampireM
+    multiplexer.options.put("print-success", Some(ff))
 
     for(command <- Parse(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
-      System.out.print(multiplexer.addCommand(command))
+      System.out.println(s"; " + command)
+      val res = multiplexer.addCommand(command)
+      System.out.print(res)
     }
   }
 }
