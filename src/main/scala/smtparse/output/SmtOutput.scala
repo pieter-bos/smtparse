@@ -189,6 +189,7 @@ case class SmtOutput(stream: Writer, dialect: Dialect) {
           case "pattern" => dialect match {
             case Dialect.Z3 => write(value)
             case Dialect.CVC5 => write(boxSingularPattern(value))
+            case Dialect.Vampire => this
           }
           case _ => write(value)
         }
@@ -224,7 +225,7 @@ case class SmtOutput(stream: Writer, dialect: Dialect) {
           write(")")
         }
         write(")")
-      case Dialect.CVC5 =>
+      case Dialect.CVC5 | Dialect.Vampire =>
         write("(")
         for(((SortDec(name, n), _), idx) <- types.zipWithIndex) {
           if(idx != 0) write(" ")

@@ -1,0 +1,1 @@
+Vampire gets stuck after `$Perm.isValidVar`. Issue: <https://github.com/vprover/vampire/issues/403>

@@ -2,9 +2,9 @@ package smtparse
 
 import smtparse.Verifier.DetachedVerification
 import smtparse.output.{Dialect, SmtOutput}
-import smtparse.parse.{Assert, Attribute, CheckSat, SExpr, SetOption, SmtCommand}
+import smtparse.parse.{Assert, Attribute, CheckSat, DeclareConst, DefineConst, SExpr, SetOption, SmtCommand}
 
-import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter}
+import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter, StringWriter}
 import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
@@ -35,20 +35,33 @@ case class PinnedOptionsVerifier(process: Seq[String], dialect: Dialect,
     DetachedVerification(() => p.destroyForcibly(), Future {
       blocking {
         val writer = new OutputStreamWriter(p.getOutputStream, StandardCharsets.UTF_8)
+        val backupWriter = new StringWriter()
         val out = SmtOutput(writer, dialect)
-        for((key, value) <- pinnedOptions) {
-          out.write(SetOption(Attribute(key, value)))
+        val backupOut = SmtOutput(backupWriter, dialect)
+        def localWrite(c: SmtCommand) = {
+          out.write(c)
+          backupOut.write(c)
         }
-        declarations.foreach(out.write)
-        assertions.foreach(out.write)
-        out.write(CheckSat)
+        for((key, value) <- pinnedOptions) {
+          localWrite(SetOption(Attribute(key, value)))
+        }
+        declarations.map {
+          case d: DeclareConst => dialect.declareConst(d)
+          case d: DefineConst => dialect.defineConst(d)
+          case d => d
+        }.foreach(localWrite)
+        assertions.foreach(localWrite)
+        localWrite(CheckSat)
         writer.close()
 
         val result = new BufferedReader(new InputStreamReader(p.getInputStream, StandardCharsets.UTF_8)).readLine() match {
           case "sat" => Sat
           case "unsat" => Unsat
           case "unknown" => Unknown
-          case err => Error(err)
+          case err =>
+            val x = err
+            println(s"---- Backup smt ----\n${backupWriter.toString}\n---- End backup smt ----")
+            Error(x)
         }
 
         p.destroyForcibly()

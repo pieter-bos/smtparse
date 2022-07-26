@@ -29,19 +29,30 @@ case class Parse(reader: Reader) extends Iterator[SmtCommand] {
       }
   }
 
-  private def consume(): SmtToken = lookahead match {
-    case Some(token) =>
-      lookahead = None
-      token
-    case None =>
-      in.next()
+  var i = 0
+  private def consume(): SmtToken = {
+    val x = lookahead match {
+      case Some(token) =>
+        lookahead = None
+        token
+      case None =>
+        in.next()
+    }
+//    i += 1
+//    println(s"Consuming: $x ($i)")
+    x
   }
 
   private def expect[T](f: PartialFunction[SmtToken, T]): T = {
     val tok = consume()
     f.lift(tok) match {
       case Some(value) => value
-      case None => throw ParseError(s"unexpected token $tok")
+      case None =>
+        println("Oops:")
+        while (in.hasNext) {
+          println(in.next())
+        }
+        throw ParseError(s"unexpected token $tok")
     }
   }
 
@@ -427,11 +438,14 @@ case class Parse(reader: Reader) extends Iterator[SmtCommand] {
 
     if(sortdecs.isEmpty) {
       val result = DeclareDataTypes(z3FlavourDatatypes())
-      expect{ case TokParenClose => () }
+      // expect{ case TokParenClose => () }
+      assert(peek.contains(TokParenClose))
       result
     } else {
       val types = starDatatype()
-      expect { case TokParenClose => () }
+      // expect { case TokParenClose => () }
+      // TODO: Shoudl be parse-error?
+      assert(peek.contains(TokParenClose))
       assert(sortdecs.length == types.length)
       DeclareDataTypes(sortdecs.zip(types))
     }
